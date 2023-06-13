@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.message.mapper.MessageInfoMapper">
+    <resultMap id="BaseResultMap" type="com.message.model.MessageInfo">
+        <id column="id" jdbcType="INTEGER" property="id" />
+        <result column="content" jdbcType="VARCHAR" property="content" />
+        <result column="topic" jdbcType="VARCHAR" property="topic" />
+        <result column="tag" jdbcType="VARCHAR" property="tag" />
+        <result column="status" jdbcType="TINYINT" property="status" />
+        <result column="create_time" jdbcType="TIMESTAMP" property="createTime" />
+        <result column="delay" jdbcType="INTEGER" property="delay" />
+    </resultMap>
+    <delete id="deleteByPrimaryKey" parameterType="java.lang.Integer">
+        delete from mq_message
+        where id = #{id,jdbcType=INTEGER}
+    </delete>
+    <insert id="insert" parameterType="com.message.model.Order">
+        insert into mq_message (id, content, topic, tag, status, create_time, delay)
+        values (#{id,jdbcType=INTEGER},
+                #{content,jdbcType=VARCHAR},
+                #{topic,jdbcType=VARCHAR},
+                #{tag,jdbcType=VARCHAR},
+                #{status,jdbcType=TINYINT},
+                #{createTime,jdbcType=TIMESTAMP},
+                #{delay,jdbcType=INTEGER})
+    </insert>
+    <update id="updateByPrimaryKey" parameterType="com.message.model.Order">
+        update mq_message
+        set content = #{content,jdbcType=VARCHAR},
+            topic = #{topic,jdbcType=VARCHAR},
+            tag = #{tag,jdbcType=VARCHAR},
+            status = #{status,jdbcType=TINYINT},
+            create_time = #{createTime,jdbcType=TIMESTAMP},
+            delay = #{delay,jdbcType=INTEGER}
+        where id = #{id,jdbcType=INTEGER}
+    </update>
+    <select id="selectByPrimaryKey" parameterType="java.lang.Integer" resultMap="BaseResultMap">
+        select id, content, topic, tag, status, create_time, delay
+        from mq_message
+        where id = #{id,jdbcType=INTEGER}
+    </select>
+    <select id="selectAll" resultMap="BaseResultMap">
+        select id, content, topic, tag, status, create_time, delay
+        from mq_message
+    </select>
+</mapper>
