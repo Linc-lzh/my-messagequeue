@@ -11,22 +11,26 @@
         where id = #{id,jdbcType=INTEGER}
     </delete>
     <insert id="insert" parameterType="com.message.model.Order">
-        insert into orders (id, order_name, create_date)
-        values (#{id,jdbcType=INTEGER}, #{userName,jdbcType=VARCHAR}, #{createDate,jdbcType=DATE})
+        insert into orders (id, order_name, create_date, content)
+        values (#{id,jdbcType=INTEGER},
+                #{orderName,jdbcType=VARCHAR},
+                #{createDate,jdbcType=DATE},
+                #{content,jdbcType=VARCHAR})
     </insert>
     <update id="updateByPrimaryKey" parameterType="com.message.model.Order">
         update orders
         set order_name = #{orderName,jdbcType=VARCHAR},
+            content = #{content,jdbcType=VARCHAR},
             create_date = #{createDate,jdbcType=DATE}
         where id = #{id,jdbcType=INTEGER}
     </update>
     <select id="selectByPrimaryKey" parameterType="java.lang.Integer" resultMap="BaseResultMap">
-        select id, order_name, create_date
+        select id, order_name, content, create_date
         from orders
         where id = #{id,jdbcType=INTEGER}
     </select>
     <select id="selectAll" resultMap="BaseResultMap">
-        select id, order_name, create_date
+        select id, order_name, content, create_date
         from orders
     </select>
 </mapper>

@@ -7,7 +7,21 @@ public class Order {
 
     private String orderName;
 
+    private String content;
+
     private Date createDate;
+
+    public Order(String content) {
+        this.content = content;
+    }
+
+    public String getContent() {
+        return content;
+    }
+
+    public void setContent(String content) {
+        this.content = content;
+    }
 
     public Integer getId() {
         return id;

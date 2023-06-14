@@ -10,10 +10,15 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.junit4.SpringRunner;
 
+import javax.xml.crypto.Data;
+
 import static org.junit.jupiter.api.Assertions.*;
 
+import java.sql.Date;
 import java.sql.Timestamp;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.util.List;
 
 @RunWith(SpringRunner.class)
@@ -26,9 +31,20 @@ public class MyBatisTest {
     private MessageInfoMapper messageInfoMapper;
 
     @Test
-    public void testSelectAllOrders(){
+    public void testInsertOrders(){
+
         List<Order> orders = orderMapper.selectAll();
-        assertEquals(0,orders.size());
+        int size = orders.size();
+
+        Order order = new Order("order");
+        order.setOrderName("book");
+        LocalDateTime localDateTime = LocalDateTime.now();
+        ZoneId zoneId = ZoneId.systemDefault();
+        ZonedDateTime zonedDateTime = localDateTime.atZone(zoneId);
+        order.setCreateDate(Date.from(zonedDateTime.toInstant()));
+        orderMapper.insert(order);
+        orders = orderMapper.selectAll();
+        assertEquals(size + 1,orders.size());
     }
 
     @Test
