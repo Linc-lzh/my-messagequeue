@@ -1,6 +1,6 @@
 package com.message.model;
 
-public class Message {
+public class MQMessage {
     /**
      * 主键
      */
@@ -26,7 +26,7 @@ public class Message {
      */
     private long nextExpireTime;
 
-    public Message(Long id, String url) {
+    public MQMessage(Long id, String url) {
         this.id = id;
         this.url = url;
         this.haveDealedTimes = 0;

@@ -1,8 +1,10 @@
 package com.message.client;
 
 import com.message.mapper.MessageInfoMapper;
+import com.message.model.MQMessage;
 import com.message.model.MessageInfo;
 import com.message.model.State;
+import com.message.processor.MsgProcessor;
 import org.apache.ibatis.session.SqlSessionFactory;
 import org.mybatis.spring.SqlSessionTemplate;
 import org.slf4j.Logger;
@@ -25,8 +27,14 @@ public abstract class TransactionMsgClient {
 
     private MessageInfoMapper messageInfoMapper;
 
+    private MsgProcessor msgProcessor;
+
     public void setMessageInfoMapper(MessageInfoMapper messageInfoMapper) {
         this.messageInfoMapper = messageInfoMapper;
+    }
+
+    public void setMsgProcessor(MsgProcessor msgProcessor) {
+        this.msgProcessor = msgProcessor;
     }
 
     public TransactionMsgClient(){
@@ -99,10 +107,8 @@ public abstract class TransactionMsgClient {
             messageInfo.setDelay(delay);
             messageInfoMapper.insert(messageInfo);
 
-//            Map.Entry<Long, String> idUrlPair = MsgStorage.insertMsg(con, content, topic, tag, delay);
-//            id = idUrlPair.getKey();
-//            Msg msg = new Msg(id, idUrlPair.getValue());
-//            msgProcessor.putMsg(msg);
+            MQMessage msg = new MQMessage(id, null);
+            msgProcessor.putMsg(msg);
         } catch (Exception ex) {
             LOGGER.error("sendMsg fail topic {} tag {} ", topic, tag, ex);
             throw ex;

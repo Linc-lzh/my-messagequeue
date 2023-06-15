@@ -2,6 +2,7 @@ package com.message.client.impl;
 
 import com.message.client.TransactionMsgClient;
 import com.message.mapper.MessageInfoMapper;
+import com.message.processor.MsgProcessor;
 import org.apache.ibatis.session.SqlSessionFactory;
 import org.mybatis.spring.SqlSessionTemplate;
 import org.springframework.beans.factory.InitializingBean;
@@ -22,6 +23,9 @@ public class MybatisTransactionMsgClient extends TransactionMsgClient implements
 
     @Autowired
     private MessageInfoMapper messageInfoMapper;
+
+    @Autowired
+    private MsgProcessor msgProcessor;
 
     public MybatisTransactionMsgClient(){
         super();
@@ -83,5 +87,6 @@ public class MybatisTransactionMsgClient extends TransactionMsgClient implements
     @Override
     public void afterPropertiesSet() throws Exception {
         super.setMessageInfoMapper(this.messageInfoMapper);
+        super.setMsgProcessor(this.msgProcessor);
     }
 }
