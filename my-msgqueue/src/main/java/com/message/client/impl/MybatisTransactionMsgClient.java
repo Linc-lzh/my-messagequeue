@@ -5,9 +5,7 @@ import com.message.mapper.MessageInfoMapper;
 import com.message.processor.MsgProcessor;
 import org.apache.ibatis.session.SqlSessionFactory;
 import org.mybatis.spring.SqlSessionTemplate;
-import org.springframework.beans.factory.InitializingBean;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Component;
 
 import javax.annotation.PostConstruct;
@@ -15,7 +13,7 @@ import javax.annotation.PreDestroy;
 import java.sql.Connection;
 
 @Component
-public class MybatisTransactionMsgClient extends TransactionMsgClient implements InitializingBean {
+public class MybatisTransactionMsgClient extends TransactionMsgClient {
 
     private SqlSessionTemplate sessionTemplate;
 
@@ -27,13 +25,10 @@ public class MybatisTransactionMsgClient extends TransactionMsgClient implements
     @Autowired
     private MsgProcessor msgProcessor;
 
-    public MybatisTransactionMsgClient(){
-        super();
-    }
-
-    @Autowired
-    public MybatisTransactionMsgClient(SqlSessionFactory sqlSessionFactory) {
-        super();
+    public MybatisTransactionMsgClient(SqlSessionFactory sqlSessionFactory,
+                                       MsgProcessor msgProcessor,
+                                       MessageInfoMapper messageInfoMapper) {
+        super(msgProcessor, messageInfoMapper);
         this.sqlSessionFactory = sqlSessionFactory;
         try {
             this.sessionTemplate = new SqlSessionTemplate(sqlSessionFactory);
@@ -54,10 +49,10 @@ public class MybatisTransactionMsgClient extends TransactionMsgClient implements
     }
 
     @Override
-    public Long sendMsg(String content, String topic, String tag)
+    public Integer sendMsg(String content, String topic, String tag)
             throws Exception {
         // Auto-generated method stub
-        Long id = null;
+        Integer id = null;
         try {
             Connection con = sessionTemplate.getConnection();
             id = super.sendMsg(con, content, topic, tag, 0);
@@ -69,10 +64,10 @@ public class MybatisTransactionMsgClient extends TransactionMsgClient implements
         }
     }
 
-    public Long sendMsg(String content, String topic, String tag, int delay)
+    public Integer sendMsg(String content, String topic, String tag, int delay)
             throws Exception {
         // Auto-generated method stub
-        Long id = null;
+        Integer id = null;
         try {
             Connection con = sessionTemplate.getConnection();
             id = super.sendMsg(con, content, topic, tag, delay);
@@ -82,11 +77,5 @@ public class MybatisTransactionMsgClient extends TransactionMsgClient implements
             LOGGER.error("sendMsg fail topic {} tag {} delay {}", topic, tag, delay, ex);
             throw new RuntimeException(ex);
         }
-    }
-
-    @Override
-    public void afterPropertiesSet() throws Exception {
-        super.setMessageInfoMapper(this.messageInfoMapper);
-        super.setMsgProcessor(this.msgProcessor);
     }
 }

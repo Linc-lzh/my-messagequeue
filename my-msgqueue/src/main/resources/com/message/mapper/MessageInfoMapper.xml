@@ -14,7 +14,11 @@
         delete from mq_message
         where id = #{id,jdbcType=INTEGER}
     </delete>
-    <insert id="insert" parameterType="com.message.model.Order">
+    <delete id="deleteByStatus" parameterType="java.lang.Integer">
+        delete from mq_message
+        where status = #{status,jdbcType=INTEGER}
+    </delete>
+    <insert id="insert" parameterType="com.message.model.MessageInfo">
         insert into mq_message (id, content, topic, tag, status, create_time, delay)
         values (#{id,jdbcType=INTEGER},
                 #{content,jdbcType=VARCHAR},
@@ -23,8 +27,11 @@
                 #{status,jdbcType=TINYINT},
                 #{createTime,jdbcType=TIMESTAMP},
                 #{delay,jdbcType=INTEGER})
+        <selectKey keyProperty="id" order="AFTER" resultType="int">
+            SELECT LAST_INSERT_ID()
+        </selectKey>
     </insert>
-    <update id="updateByPrimaryKey" parameterType="com.message.model.Order">
+    <update id="updateByPrimaryKey" parameterType="com.message.model.MessageInfo">
         update mq_message
         set content = #{content,jdbcType=VARCHAR},
             topic = #{topic,jdbcType=VARCHAR},
@@ -34,10 +41,21 @@
             delay = #{delay,jdbcType=INTEGER}
         where id = #{id,jdbcType=INTEGER}
     </update>
+    <update id="setConfirm" parameterType="com.message.model.MessageInfo">
+        update mq_message
+        set
+            status = 1
+        where id = #{id,jdbcType=INTEGER}
+    </update>
     <select id="selectByPrimaryKey" parameterType="java.lang.Integer" resultMap="BaseResultMap">
         select id, content, topic, tag, status, create_time, delay
         from mq_message
         where id = #{id,jdbcType=INTEGER}
+    </select>
+    <select id="selectByStatus" parameterType="java.lang.Integer" resultMap="BaseResultMap">
+        select id, content, topic, tag, status, create_time, delay
+        from mq_message
+        where status = #{status,jdbcType=INTEGER}
     </select>
     <select id="selectAll" resultMap="BaseResultMap">
         select id, content, topic, tag, status, create_time, delay

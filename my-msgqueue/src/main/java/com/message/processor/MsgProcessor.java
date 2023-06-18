@@ -1,13 +1,28 @@
 package com.message.processor;
 
+import com.message.mapper.MessageInfoMapper;
 import com.message.model.MQMessage;
+import com.message.model.MessageInfo;
+import com.message.model.MyConstants;
 import com.message.model.State;
 import com.message.util.NxThreadFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.amqp.core.Message;
+import org.springframework.amqp.core.MessageProperties;
+import org.springframework.amqp.rabbit.connection.CorrelationData;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.amqp.support.converter.Jackson2JsonMessageConverter;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Component;
 
+import javax.sql.DataSource;
+import java.io.UnsupportedEncodingException;
+import java.sql.SQLException;
 import java.util.Comparator;
+import java.util.Iterator;
+import java.util.List;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -64,6 +79,12 @@ public class MsgProcessor {
      */
     private AtomicReference<State> state;
 
+    @Autowired
+    private RabbitTemplate rabbitTemplate;
+
+    @Autowired
+    private MessageInfoMapper messageInfoMapper;
+
     public MsgProcessor() {
         msgQueue = new PriorityBlockingQueue<MQMessage>(5000, new Comparator<MQMessage>() {
             @Override
@@ -101,6 +122,31 @@ public class MsgProcessor {
             LOGGER.info("Msg Processor have inited return");
             return;
         }
+
+        rabbitTemplate.setMandatory(true);
+
+        rabbitTemplate.setConfirmCallback(new RabbitTemplate.ConfirmCallback() {
+            @Override
+            public void confirm(CorrelationData correlationData, boolean ack, String cause) {
+                Message returnedMessage = correlationData.getReturnedMessage();
+                MQMessage msg = MQMessage.fromBytes(returnedMessage.getBody());
+                if(ack){
+                    LOGGER.debug("msgId {} updateMsgStatus success", correlationData.getId());
+                    MessageInfo messageInfo = new MessageInfo();
+                    messageInfo.setId(Integer.valueOf(correlationData.getId()));
+                    messageInfoMapper.setConfirm(messageInfo);
+                }
+                else {
+                    if (msg.getHaveDealedTimes() < MAX_DEAL_TIME) {
+                        long nextExpireTime = System.currentTimeMillis() + TIMEOUT_DATA[msg.getHaveDealedTimes()];
+                        msg.setNextExpireTime(nextExpireTime);
+                        timeWheel.put(msg);
+                        // 这里可以优化 ，因为已经确认事务提交了，可以从DB中拿到了
+                        LOGGER.debug("put msg in timeWhellQueue {} ", msg);
+                    }
+                }
+            }
+        });
         LOGGER.info("MsgProcessor init start");
         state.compareAndSet(State.CREATE, State.RUNNING);
 
@@ -108,6 +154,38 @@ public class MsgProcessor {
         for (int i = 0; i < 10; i++) {
             exeService.submit(new MsgDeliverTask());
         }
+
+        scheService = Executors.newScheduledThreadPool(10, new NxThreadFactory("MsgScheduledThread-"));
+
+        scheService.scheduleAtFixedRate(new TimeWheelTask(), TIME_WHEEL_PERIOD, TIME_WHEEL_PERIOD, TimeUnit.MILLISECONDS);
+
+        scheService.scheduleAtFixedRate(new CleanMsgTask(), 180 , 180, TimeUnit.SECONDS);
+
+        scheService.scheduleAtFixedRate(new ScanMsgTask(), 120, 120, TimeUnit.SECONDS);
+
+        scheService.scheduleAtFixedRate(new Runnable() {
+            @Override
+            public void run() {
+                LOGGER.info("stats info msgQueue size {} timeWheelQueue size {}", msgQueue.size(), timeWheel.size());
+            }
+        }, 20, 120, TimeUnit.SECONDS);
+    }
+
+    private void sendMsg(String topic, Integer messageId, String message, @Nullable MQMessage msg) throws UnsupportedEncodingException {
+        MessageProperties messageProperties = new MessageProperties();
+        messageProperties.setContentType(MessageProperties.CONTENT_TYPE_TEXT_PLAIN);
+        messageProperties.setPriority(2);
+
+        CorrelationData correlationData = new CorrelationData(messageId.toString());
+        if(msg != null){
+            correlationData.setReturnedMessage(new Message(msg.asBytesArray(), messageProperties));
+        }
+
+        rabbitTemplate.setMessageConverter(new Jackson2JsonMessageConverter());
+        rabbitTemplate.send(MyConstants.EXCHANGE_NAME,
+                topic,
+                new Message(message.getBytes("UTF-8"), messageProperties),
+                correlationData);
     }
 
     class MsgDeliverTask implements Runnable {
@@ -117,56 +195,98 @@ public class MsgProcessor {
                 if (!state.get().equals(State.RUNNING)) {
                     break;
                 }
-//                try {
-//                    // 1、每100ms从 队列 弹出一条事务操作消息
-//                    MQMessage msg = null;
-//                    try {
-//                        msg = msgQueue.poll(DEF_TIMEOUT_MS, TimeUnit.MILLISECONDS);
-//                    } catch (InterruptedException ex) {
-//                    }
-//                    if (msg == null) {
-//                        continue;
-//                    }
-//                    LOGGER.debug("poll msg {}", msg);
-//                    int dealedTime = msg.getHaveDealedTimes() + 1;
-//                    msg.setHaveDealedTimes(dealedTime);
-//                    // 2、从db获取实际事务消息(这里我们不知道是否事务已经提交，所以需要从DB里面拿)
-//                    MsgInfo msgInfo = msgStorage.getMsgById(msg);
-//                    LOGGER.debug("getMsgInfo from DB {}", msgInfo);
-//                    if (msgInfo == null) {
-//                        if (dealedTime < MAX_DEAL_TIME) {
-//                            // 3.1、加入时间轮转动队列:重试投递
-//                            long nextExpireTime = System.currentTimeMillis() + TIMEOUT_DATA[dealedTime];
-//                            msg.setNextExpireTime(nextExpireTime);
-//                            timeWheel.put(msg);
-//                            LOGGER.debug("put msg in timeWhellQueue {} ", msg);
-//                        }
-//                    } else {
-//                        // 3.2、投递事务消息
-//                        Message mqMsg = buildMsg(msgInfo);
-//                        LOGGER.debug("will sendMsg {}", mqMsg);
-//                        SendResult result = producer.send(mqMsg);
-//                        LOGGER.info("msgId {} topic {} tag {} sendMsg result {}", msgInfo.getId(), mqMsg.getTopic(), mqMsg.getTags(), result);
-//                        if (null == result || result.getSendStatus() != SendStatus.SEND_OK) {
-//                            // 投递失败，重入时间轮
-//                            if (dealedTime < MAX_DEAL_TIME) {
-//                                long nextExpireTime = System.currentTimeMillis() + TIMEOUT_DATA[dealedTime];
-//                                msg.setNextExpireTime(nextExpireTime);
-//                                timeWheel.put(msg);
-//                                // 这里可以优化 ，因为已经确认事务提交了，可以从DB中拿到了
-//                                LOGGER.debug("put msg in timeWhellQueue {} ", msg);
-//                            }
-//                        } else if (result.getSendStatus() == SendStatus.SEND_OK) {
-//                            // 投递成功，修改数据库的状态(标识已提交)
-//                            int res = msgStorage.updateSendMsg(msg);
-//                            LOGGER.debug("msgId {} updateMsgStatus success res {}", msgInfo.getId(), res);
-//                        }
-//                    }
-//                } catch (Throwable t) {
-//                    LOGGER.error("MsgProcessor deal msg fail", t);
-//                }
+                try {
+                    // 1、每100ms从 队列 弹出一条事务操作消息
+                    MQMessage msg = null;
+                    try {
+                        msg = msgQueue.poll(DEF_TIMEOUT_MS, TimeUnit.MILLISECONDS);
+                    } catch (InterruptedException ex) {
+                    }
+                    if (msg == null) {
+                        continue;
+                    }
+                    LOGGER.debug("poll msg {}", msg);
+                    int dealedTime = msg.getHaveDealedTimes() + 1;
+                    msg.setHaveDealedTimes(dealedTime);
+                    MessageInfo msgInfo = messageInfoMapper.selectByPrimaryKey(msg.getId());
+                    LOGGER.debug("getMsgInfo from DB {}", msgInfo);
+                    if (msgInfo == null) {
+                        if (dealedTime < MAX_DEAL_TIME) {
+                            // 3.1、加入时间轮转动队列:重试投递
+                            long nextExpireTime = System.currentTimeMillis() + TIMEOUT_DATA[dealedTime];
+                            msg.setNextExpireTime(nextExpireTime);
+                            timeWheel.put(msg);
+                            LOGGER.debug("put msg in timeWhellQueue {} ", msg);
+                        }
+                    } else {
+                        // 3.2、投递事务消息
+                        LOGGER.debug("will sendMsg {}", msgInfo.getContent());
+                        sendMsg(msgInfo.getTopic(), msgInfo.getId(), msgInfo.getContent(), msg);
+                    }
+                } catch (Throwable t) {
+                    LOGGER.error("MsgProcessor deal msg fail", t);
+                }
             }
         }
+    }
+
+    class TimeWheelTask implements Runnable {
+        @Override
+        public void run() {
+            try {
+                if (state.get().equals(State.RUNNING)) {
+                    long cruTime = System.currentTimeMillis();
+                    MQMessage msg = timeWheel.peek();
+                    // 拿出来的时候有可能还没有超时
+                    while (msg != null && msg.getNextExpireTime() <= cruTime) {
+                        msg = timeWheel.poll();
+                        LOGGER.debug("timeWheel poll msg ,return to msgQueue {}", msg);
+                        // 重新放进去
+                        msgQueue.put(msg);
+                        msg = timeWheel.peek();
+                    }
+                }
+            } catch (Exception ex) {
+                LOGGER.error("pool timequeue error", ex);
+            }
+        }
+    }
+
+    class CleanMsgTask implements Runnable {
+        @Override
+        public void run() {
+            if (state.get().equals(State.RUNNING)) {
+                LOGGER.debug("DeleteMsg start run");
+                try {
+                    messageInfoMapper.deleteByStatus(0);
+                } catch (Exception ex) {
+                    LOGGER.error("delete Run error ", ex);
+                }
+            }
+        }
+    }
+
+    class ScanMsgTask implements Runnable {
+        @Override
+        public void run() {
+            if (state.get().equals(State.RUNNING)) {
+                LOGGER.debug("SchedScanMsg start run");
+                List<MessageInfo> list = messageInfoMapper.selectByStatus(1);
+                int num = list.size();
+                if (num > 0) {
+                    LOGGER.debug("scan db get msg size {} ", num);
+                }
+
+                for (MessageInfo msgInfo : list) {
+                    try {
+                        sendMsg(msgInfo.getTopic(), msgInfo.getId(), msgInfo.getContent(), null);
+                    } catch (Exception e) {
+                        LOGGER.error("SchedScanMsg deal fail", e);
+                    }
+                }
+            }
+        }
+
     }
 }
 

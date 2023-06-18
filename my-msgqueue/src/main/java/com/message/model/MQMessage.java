@@ -1,15 +1,12 @@
 package com.message.model;
 
-public class MQMessage {
+import java.io.*;
+
+public class MQMessage implements Serializable {
     /**
      * 主键
      */
-    private Long id;
-
-    /**
-     * db-url key, 跟 数据源map做映射
-     */
-    private String url;
+    private Integer id;
 
     /**
      * 已经处理次数
@@ -26,27 +23,18 @@ public class MQMessage {
      */
     private long nextExpireTime;
 
-    public MQMessage(Long id, String url) {
+    public MQMessage(Integer id) {
         this.id = id;
-        this.url = url;
         this.haveDealedTimes = 0;
         this.createTime = System.currentTimeMillis();
     }
 
-    public Long getId() {
+    public Integer getId() {
         return id;
     }
 
-    public void setId(Long id) {
+    public void setId(Integer id) {
         this.id = id;
-    }
-
-    public String getUrl() {
-        return url;
-    }
-
-    public void setUrl(String url) {
-        this.url = url;
     }
 
     public int getHaveDealedTimes() {
@@ -73,11 +61,46 @@ public class MQMessage {
         this.nextExpireTime = nextExpireTime;
     }
 
+    public byte[] asBytesArray(){
+        byte[] bytes = null;
+        try{
+            ByteArrayOutputStream bo = new ByteArrayOutputStream();
+            ObjectOutputStream oo = new ObjectOutputStream(bo);
+            oo.writeObject(this);
+            bytes = bo.toByteArray();
+
+            bo.close();
+            oo.close();
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+
+        return bytes;
+    }
+
+    public static MQMessage fromBytes(byte[] bytes){
+        MQMessage result = null;
+        ByteArrayInputStream bis = new ByteArrayInputStream(bytes);
+        ObjectInputStream ois = null;
+        try {
+            ois = new ObjectInputStream(bis);
+            result = (MQMessage) ois.readObject();
+
+            ois.close();
+            bis.close();
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        } catch (ClassNotFoundException e) {
+            throw new RuntimeException(e);
+        }
+
+        return result;
+    }
+
     @Override
     public String toString() {
-        return "Message{" +
+        return "MQMessage{" +
                 "id=" + id +
-                ", url='" + url + '\'' +
                 ", haveDealedTimes=" + haveDealedTimes +
                 ", createTime=" + createTime +
                 ", nextExpireTime=" + nextExpireTime +

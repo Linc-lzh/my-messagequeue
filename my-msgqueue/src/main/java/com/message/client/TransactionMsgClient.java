@@ -11,11 +11,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.sql.Connection;
+import java.sql.Timestamp;
+import java.time.LocalDateTime;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 
 public abstract class TransactionMsgClient {
-    private static final String MQ_PRODUCER_NAME = "TransactionMsgProducer";
 
     private static final int MIN_DELAY = 0;
 
@@ -37,7 +38,9 @@ public abstract class TransactionMsgClient {
         this.msgProcessor = msgProcessor;
     }
 
-    public TransactionMsgClient(){
+    public TransactionMsgClient(MsgProcessor msgProcessor, MessageInfoMapper messageInfoMapper) {
+        this.msgProcessor = msgProcessor;
+        this.messageInfoMapper = messageInfoMapper;
         state = new AtomicReference<State>(State.CREATE);
     }
 
@@ -50,7 +53,7 @@ public abstract class TransactionMsgClient {
         LOGGER.info("start init state {} this {}", state, this);
 
         try {
-
+            msgProcessor.init();
             LOGGER.info("end init success");
         } catch (Exception ex) {
             LOGGER.error("producer start fail", ex);
@@ -68,29 +71,28 @@ public abstract class TransactionMsgClient {
         }
     }
 
-    public abstract Long sendMsg(String content, String topic, String tag)
+    public abstract Integer sendMsg(String content, String topic, String tag)
             throws Exception;
 
-    public Long sendMsg(Connection con, String content, String topic, String tag, int delay)
+    public Integer sendMsg(Connection con, String content, String topic, String tag, int delay)
             throws Exception {
         // 1、消息校验
-        Long id = null;
+        Integer id = null;
         if (!state.get().equals(State.RUNNING)) {
             LOGGER.error("TransactionMsgClient not Running , please call init function");
             throw new Exception("TransactionMsgClient not Running , please call init function");
         }
+
         if (content == null || content.isEmpty() || topic == null || topic.isEmpty()) {
             LOGGER.error("content or topic is null or empty");
             throw new Exception("content or topic is null or empty, notice ");
         }
-//        if (!msgStorage.isInTopicLists(topic)) {
-//            LOGGER.error("wan't to send msg in topic " + topic + " which is not in topicLists of config, can't resend if send failed");
-//            throw new Exception("wan't to send msg in topic " + topic + " which is not in topicLists of config, can't resend if send failed");
-//        }
+
         if (delay < MIN_DELAY || delay > MAX_DELAY) {
             LOGGER.error("delay can't <" + MIN_DELAY + " or > " + MAX_DELAY);
             throw new Exception("delay can't <" + MIN_DELAY + " or > " + MAX_DELAY);
         }
+        
         try {
             LOGGER.debug("insert to msgTable topic {} tag {} Connection {} Autocommit {} ", topic, tag, con, con.getAutoCommit());
             if (con.getAutoCommit()) {
@@ -100,14 +102,15 @@ public abstract class TransactionMsgClient {
 
             // 2、双写消息，先写DB，在写queue
             MessageInfo messageInfo = new MessageInfo();
-            messageInfo.setTopic("topic1");
+            messageInfo.setTopic("topic");
             messageInfo.setTag("tag");
             messageInfo.setStatus(0);
             messageInfo.setContent(content);
             messageInfo.setDelay(delay);
+            messageInfo.setCreateTime(Timestamp.valueOf(LocalDateTime.now()));
             messageInfoMapper.insert(messageInfo);
 
-            MQMessage msg = new MQMessage(id, null);
+            MQMessage msg = new MQMessage(messageInfo.getId());
             msgProcessor.putMsg(msg);
         } catch (Exception ex) {
             LOGGER.error("sendMsg fail topic {} tag {} ", topic, tag, ex);

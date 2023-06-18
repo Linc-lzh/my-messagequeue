@@ -56,16 +56,16 @@ public class MyBatisTest {
         messageInfo.setStatus(0);
         messageInfo.setTopic("topic");
         messageInfo.setCreateTime(Timestamp.valueOf(LocalDateTime.now()));
-        List<Order> messages = messageInfoMapper.selectAll();
+        List<MessageInfo> messages = messageInfoMapper.selectAll();
         int size = messages.size();
         messageInfoMapper.insert(messageInfo);
-        List<Order> actualMessages = messageInfoMapper.selectAll();
+        List<MessageInfo> actualMessages = messageInfoMapper.selectAll();
         assertEquals(size + 1, actualMessages.size());
     }
 
     @Test
     public void testSelectAllMessages(){
-        List<Order> messages = messageInfoMapper.selectAll();
+        List<MessageInfo> messages = messageInfoMapper.selectAll();
         assertEquals(0,messages.size());
     }
 }

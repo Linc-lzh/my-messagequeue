@@ -1,10 +1,10 @@
 package com.message.model;
 
 import java.sql.Timestamp;
-import java.util.Date;
+
 
 public class MessageInfo {
-    private Long id;
+    private Integer id;
 
     /**
      * 事务消息
@@ -39,11 +39,11 @@ public class MessageInfo {
     public MessageInfo() {
     }
 
-    public Long getId() {
+    public Integer getId() {
         return id;
     }
 
-    public void setId(Long id) {
+    public void setId(Integer id) {
         this.id = id;
     }
 
