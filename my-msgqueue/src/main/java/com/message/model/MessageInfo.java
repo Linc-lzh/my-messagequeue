@@ -31,12 +31,22 @@ public class MessageInfo {
      */
     private Timestamp createTime;
 
+    private long createAt;
+
     /**
      * 延迟时间(单位：s)
      */
     private int delay;
 
     public MessageInfo() {
+    }
+
+    public long getCreateAt() {
+        return createAt;
+    }
+
+    public void setCreateAt(long createAt) {
+        this.createAt = createAt;
     }
 
     public Integer getId() {

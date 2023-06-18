@@ -9,6 +9,7 @@
         <result column="status" jdbcType="TINYINT" property="status" />
         <result column="create_time" jdbcType="TIMESTAMP" property="createTime" />
         <result column="delay" jdbcType="INTEGER" property="delay" />
+        <result column="create_at" jdbcType="BIGINT" property="createAt" />
     </resultMap>
     <delete id="deleteByPrimaryKey" parameterType="java.lang.Integer">
         delete from mq_message
@@ -19,14 +20,15 @@
         where status = #{status,jdbcType=INTEGER}
     </delete>
     <insert id="insert" parameterType="com.message.model.MessageInfo">
-        insert into mq_message (id, content, topic, tag, status, create_time, delay)
+        insert into mq_message (id, content, topic, tag, status, create_time, delay, create_at)
         values (#{id,jdbcType=INTEGER},
                 #{content,jdbcType=VARCHAR},
                 #{topic,jdbcType=VARCHAR},
                 #{tag,jdbcType=VARCHAR},
                 #{status,jdbcType=TINYINT},
                 #{createTime,jdbcType=TIMESTAMP},
-                #{delay,jdbcType=INTEGER})
+                #{delay,jdbcType=INTEGER},
+                #{createAt,jdbcType=BIGINT})
         <selectKey keyProperty="id" order="AFTER" resultType="int">
             SELECT LAST_INSERT_ID()
         </selectKey>
@@ -48,12 +50,12 @@
         where id = #{id,jdbcType=INTEGER}
     </update>
     <select id="selectByPrimaryKey" parameterType="java.lang.Integer" resultMap="BaseResultMap">
-        select id, content, topic, tag, status, create_time, delay
+        select id, content, topic, tag, status, create_time, delay, create_at
         from mq_message
         where id = #{id,jdbcType=INTEGER}
     </select>
     <select id="selectByStatus" parameterType="java.lang.Integer" resultMap="BaseResultMap">
-        select id, content, topic, tag, status, create_time, delay
+        select id, content, topic, tag, status, create_time, delay, create_at
         from mq_message
         where status = #{status,jdbcType=INTEGER}
     </select>

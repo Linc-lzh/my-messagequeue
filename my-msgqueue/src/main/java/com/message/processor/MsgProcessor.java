@@ -20,6 +20,8 @@ import org.springframework.stereotype.Component;
 import javax.sql.DataSource;
 import java.io.UnsupportedEncodingException;
 import java.sql.SQLException;
+import java.sql.Timestamp;
+import java.time.LocalDateTime;
 import java.util.Comparator;
 import java.util.Iterator;
 import java.util.List;
@@ -161,7 +163,7 @@ public class MsgProcessor {
 
         scheService.scheduleAtFixedRate(new CleanMsgTask(), 180 , 180, TimeUnit.SECONDS);
 
-        scheService.scheduleAtFixedRate(new ScanMsgTask(), 120, 120, TimeUnit.SECONDS);
+        scheService.scheduleAtFixedRate(new ScanMsgTask(), 10, 60, TimeUnit.SECONDS);
 
         scheService.scheduleAtFixedRate(new Runnable() {
             @Override
@@ -221,7 +223,10 @@ public class MsgProcessor {
                     } else {
                         // 3.2、投递事务消息
                         LOGGER.debug("will sendMsg {}", msgInfo.getContent());
-                        sendMsg(msgInfo.getTopic(), msgInfo.getId(), msgInfo.getContent(), msg);
+                        if(msgInfo.getDelay() == 0){
+                            sendMsg(msgInfo.getTopic(), msgInfo.getId(), msgInfo.getContent(), msg);
+                        }
+
                     }
                 } catch (Throwable t) {
                     LOGGER.error("MsgProcessor deal msg fail", t);
@@ -258,7 +263,7 @@ public class MsgProcessor {
             if (state.get().equals(State.RUNNING)) {
                 LOGGER.debug("DeleteMsg start run");
                 try {
-                    messageInfoMapper.deleteByStatus(0);
+                    messageInfoMapper.deleteByStatus(1);
                 } catch (Exception ex) {
                     LOGGER.error("delete Run error ", ex);
                 }
@@ -271,7 +276,7 @@ public class MsgProcessor {
         public void run() {
             if (state.get().equals(State.RUNNING)) {
                 LOGGER.debug("SchedScanMsg start run");
-                List<MessageInfo> list = messageInfoMapper.selectByStatus(1);
+                List<MessageInfo> list = messageInfoMapper.selectByStatus(0);
                 int num = list.size();
                 if (num > 0) {
                     LOGGER.debug("scan db get msg size {} ", num);
@@ -279,7 +284,16 @@ public class MsgProcessor {
 
                 for (MessageInfo msgInfo : list) {
                     try {
-                        sendMsg(msgInfo.getTopic(), msgInfo.getId(), msgInfo.getContent(), null);
+                        if(msgInfo.getDelay() > 0){
+                            long sendTime = msgInfo.getCreateAt() + msgInfo.getDelay() * 60 * 1000;
+                            long now = System.currentTimeMillis();
+                            MQMessage msg = new MQMessage(msgInfo.getId());
+                            if(sendTime <= now)
+                                sendMsg(msgInfo.getTopic(), msgInfo.getId(), msgInfo.getContent(), msg);
+                        }
+                        else
+                            sendMsg(msgInfo.getTopic(), msgInfo.getId(), msgInfo.getContent(), null);
+
                     } catch (Exception e) {
                         LOGGER.error("SchedScanMsg deal fail", e);
                     }

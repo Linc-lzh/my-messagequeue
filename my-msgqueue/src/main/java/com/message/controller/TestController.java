@@ -33,4 +33,11 @@ public class TestController {
         orderService.insertOrder(content);
         return "Done";
     }
+
+    @RequestMapping("/insertDelayOrder")
+    @ResponseBody
+    public String insertOrder(@RequestParam(value="content") String content, @RequestParam(value="delay") int delay) throws Exception {
+        orderService.insertDelayOrder(content, delay);
+        return "Done";
+    }
 }

@@ -71,7 +71,7 @@ public abstract class TransactionMsgClient {
         }
     }
 
-    public abstract Integer sendMsg(String content, String topic, String tag)
+    public abstract Integer sendMsg(String content, String topic, String tag, int delay)
             throws Exception;
 
     public Integer sendMsg(Connection con, String content, String topic, String tag, int delay)
@@ -92,7 +92,7 @@ public abstract class TransactionMsgClient {
             LOGGER.error("delay can't <" + MIN_DELAY + " or > " + MAX_DELAY);
             throw new Exception("delay can't <" + MIN_DELAY + " or > " + MAX_DELAY);
         }
-        
+
         try {
             LOGGER.debug("insert to msgTable topic {} tag {} Connection {} Autocommit {} ", topic, tag, con, con.getAutoCommit());
             if (con.getAutoCommit()) {
@@ -108,6 +108,7 @@ public abstract class TransactionMsgClient {
             messageInfo.setContent(content);
             messageInfo.setDelay(delay);
             messageInfo.setCreateTime(Timestamp.valueOf(LocalDateTime.now()));
+            messageInfo.setCreateAt(System.currentTimeMillis());
             messageInfoMapper.insert(messageInfo);
 
             MQMessage msg = new MQMessage(messageInfo.getId());
